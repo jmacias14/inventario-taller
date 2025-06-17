@@ -1,0 +1,12 @@
+{
+  "name": "inventario-taller-full",
+  "version": "1.0.0",
+  "description": "Este proyecto es una aplicación web completa para gestionar el inventario de un taller mecánico.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

@@ -1,0 +1,57 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_USER: inventario
+      POSTGRES_PASSWORD: inventario123
+      POSTGRES_DB: inventario
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  backend:
+    build:
+      context: ./backend
+      args:
+        NODE_ENV: ${NODE_ENV:-production}
+    restart: always
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgres://inventario:inventario123@db:5432/inventario
+      NODE_ENV: ${NODE_ENV:-production}
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./certs/dev-cert.pem:/app/certs/dev-cert.pem:ro
+      - ./certs/dev-key.pem:/app/certs/dev-key.pem:ro
+    command: >
+      sh -c "chmod +x ./wait-for-it.sh &&
+             ./wait-for-it.sh db:5432 -- npm start"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NODE_ENV: ${NODE_ENV:-production}
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "5173:5173"
+    env_file:
+      - ./frontend/.env
+    volumes:
+      - ./certs/dev-cert.pem:/app/certs/dev-cert.pem:ro
+      - ./certs/dev-key.pem:/app/certs/dev-key.pem:ro
+    environment:
+      VITE_HTTPS: "true"
+      VITE_SSL_CERT: "/app/certs/dev-cert.pem"
+      VITE_SSL_KEY: "/app/certs/dev-key.pem"
+
+volumes:
+  postgres-data:

@@ -1,0 +1,71 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Producto {
+  id             Int          @id @default(autoincrement())
+  sku            String       @unique   // <-- agregado unique
+  marca          String
+  descripcion    String
+  cantidad       Float
+  unidad         String
+  observaciones  String?
+  repisaId       Int?
+  repisa         Repisa?      @relation(fields: [repisaId], references: [id])
+  estanteId      Int?
+  estante        Estante?     @relation(fields: [estanteId], references: [id])
+  ubicacionLibre String?
+  updatedAt      DateTime     @updatedAt
+  movimientos    Movimiento[]
+  ventaItems     VentaItem[]
+}
+
+model Movimiento {
+  id          Int       @id @default(autoincrement())
+  tipo        String    // Ejemplo: "entrada", "salida", etc.
+  cantidad    Float
+  fecha       DateTime  @default(now())
+  observacion String?
+  producto    Producto  @relation(fields: [productoId], references: [id])
+  productoId  Int
+  ventaId     Int?      // Nueva columna nullable para la relación con Venta
+  venta       Venta?    @relation(fields: [ventaId], references: [id])
+}
+
+model Venta {
+  id           Int        @id @default(autoincrement())
+  comentarios  String?
+  createdAt    DateTime   @default(now())
+  items        VentaItem[]
+  movimientos  Movimiento[]  // Relación inversa para movimientos asociados a esta venta
+}
+
+model VentaItem {
+  id          Int       @id @default(autoincrement())
+  cantidad    Float
+  ventaId     Int
+  venta       Venta     @relation(fields: [ventaId], references: [id])
+  producto    Producto  @relation(fields: [productoId], references: [id])
+  productoId  Int
+}
+
+model Repisa {
+  id        Int        @id @default(autoincrement())
+  letra     String     @unique
+  estantes  Estante[]
+  productos Producto[]
+}
+
+model Estante {
+  id        Int       @id @default(autoincrement())
+  numero    String
+  repisaId  Int
+  repisa    Repisa    @relation(fields: [repisaId], references: [id])
+  productos Producto[]
+}
