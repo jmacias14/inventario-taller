@@ -38,7 +38,7 @@ export default function HistorialVentas() {
   const confirmarAnularVenta = async () => {
     if (!ventaAAnular) return;
     try {
-      await api.delete(`/ventas/${ventaAAnular.id}`);
+      await api.post(`/ventas/anular/${ventaAAnular.id}`);
       await fetchVentas();
       setVentaAAnular(null);
       showToast("Venta anulada y stock restaurado correctamente.", "success");
@@ -168,6 +168,11 @@ export default function HistorialVentas() {
                       minute: "2-digit",
                     })}
                   </p>
+                  {venta.anulada && (
+                    <span className="ml-2 px-2 py-1 text-xs font-semibold bg-red-100 text-red-800 rounded">
+                      Anulada
+                    </span>
+                  )}
                   <p className="text-sm text-gray-600">{venta.comentarios}</p>
                 </div>
               </div>
@@ -186,7 +191,8 @@ export default function HistorialVentas() {
                 </button>
                 <button
                   onClick={() => setVentaAAnular(venta)}
-                  className="text-red-600 p-2 rounded hover:bg-red-50"
+                    disabled={venta.anulada}
+                    className={`text-red-600 p-2 rounded ${venta.anulada ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-50'}`}
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -265,6 +271,33 @@ export default function HistorialVentas() {
             <div className="flex justify-end gap-2">
               <button onClick={() => setModalRemito(null)} className="px-4 py-2 bg-gray-200 rounded">Cancelar</button>
               <button onClick={generarRemitoPDF} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Generar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {ventaAAnular && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full" role="dialog" aria-labelledby="anular-title">
+            <h2 id="anular-title" className="text-lg font-bold mb-4 text-gray-800">
+              ¿Anular venta #{ventaAAnular.id}?
+            </h2>
+            <p className="text-sm text-gray-600 mb-6">
+              Al anular se restaurará el stock de los productos vendidos.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setVentaAAnular(null)}
+                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarAnularVenta}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors"
+              >
+                Confirmar anulación
+              </button>
             </div>
           </div>
         </div>

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { api } from "../api.js"
 import { useVentaStore } from '../store/ventaStore'
 import { useToast } from '../context/ToastContext'
-import { Search, ChevronRight, ChevronUp, Trash2, Plus, ShoppingCart } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, ChevronUp, Trash2, Plus, ShoppingCart } from 'lucide-react'
 
 // Función utilitaria para pluralizar unidades
 const pluralizarUnidad = (unidad, cantidad) => {
@@ -35,6 +35,8 @@ export default function Stock() {
   const [cantidadFiltro, setCantidadFiltro] = useState('')
   const [pagina, setPagina] = useState(1)
   const [totalPaginas, setTotalPaginas] = useState(1)
+  // Nuevo estado para el input de paginación
+  const [pageInput, setPageInput] = useState(1)
 
   // Estados de estructura y UI
   const [estructuraRaw, setEstructuraRaw] = useState([])
@@ -114,6 +116,22 @@ export default function Stock() {
     }
   }, [query, cantidadFiltro, debouncedSearch, fetchProductos])
 
+  // Sincronizar el input de página con la página actual
+  useEffect(() => {
+    setPageInput(pagina)
+  }, [pagina])
+
+  // Handler para salto directo de página
+  const goToPage = () => {
+    const p = Number(pageInput)
+    if (p >= 1 && p <= totalPaginas) {
+      setPagina(p)
+    } else {
+      showToast('Página inválida', 'error')
+      setPageInput(pagina)
+    }
+  }
+
   // Modal de venta
   const abrirModalVenta = (producto) => {
     setModal(producto)
@@ -135,14 +153,14 @@ export default function Stock() {
   const abrirModalEditar = (producto) => {
     const tipoUbicacion = producto.tipoUbicacion || (producto.ubicacionLibre ? 'otro' : 'repisa')
     setFormEditar({
-      ...producto,
-      tipoUbicacion,
-      repisaId: producto.repisa?.id || null,
-      repisaLetra: producto.repisa?.letra || '',
-      estanteId: producto.estante?.id || null,
-      estanteNumero: producto.estante?.numero || '',
-      ubicacionLibre: producto.ubicacionLibre || ''
-    })
+  ...producto,
+  tipoUbicacion,
+  repisaId: producto.repisaId ?? producto.repisa?.id ?? null,
+  repisaLetra: producto.repisa?.letra || '',
+  estanteId: producto.estanteId ?? producto.estante?.id ?? null,
+  estanteNumero: producto.estante?.numero || '',
+  ubicacionLibre: producto.ubicacionLibre || ''
+})
     setProductoEditar(producto)
     setErroresEditar({})
     setConfirmarStockMenor(false)
@@ -194,14 +212,15 @@ export default function Stock() {
     }
 
     try {
+      // Limpiar campos no válidos para Prisma y mapear otros
+      const { id, updatedAt, repisaLetra, estanteNumero, tipoUbicacion, origen, ...rest } = formEditar
       const dataFinal = {
-        ...formEditar,
-        cantidad: parseFloat(formEditar.cantidad),
-        repisaId: formEditar.tipoUbicacion === 'repisa' ? formEditar.repisaId : null,
-        estanteId: formEditar.tipoUbicacion === 'repisa' ? formEditar.estanteId : null,
-        ubicacionLibre: formEditar.tipoUbicacion === 'otro' ? formEditar.ubicacionLibre : null,
+        ...rest,
+        cantidad: nuevaCantidad,
+        repisaId: tipoUbicacion === 'repisa' ? rest.repisaId : null,
+        estanteId: tipoUbicacion === 'repisa' ? rest.estanteId : null,
+        ubicacionLibre: tipoUbicacion === 'otro' ? rest.ubicacionLibre : null
       }
-
       await api.put(`/products/${productoEditar.id}`, dataFinal)
       showToast('Producto actualizado correctamente', 'success')
       setProductoEditar(null)
@@ -307,12 +326,12 @@ export default function Stock() {
               <div
                 key={prod.id}
                 className={`p-4 border rounded bg-white shadow-sm transition-colors ${
-                  prod.cantidad <= 1 ? 'bg-red-50 border-red-200' : 'hover:shadow-md'
-                }`}
+  prod.cantidad === 0 ? 'border-red-500' : prod.cantidad < 2 ? 'border-yellow-500' : 'border-gray-200 hover:shadow-md'
+}`}
               >
                 <div className="flex justify-between items-center">
                   <div
-                    className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded flex-1 transition-colors"
+                    className="flex items-center gap-2 cursor-pointer  p-2 rounded flex-1 transition-colors"
                     onClick={() => setExpandido(expandido === prod.id ? null : prod.id)}
                     role="button"
                     tabIndex={0}
@@ -334,15 +353,15 @@ export default function Stock() {
                       <p className="text-sm text-gray-600">
                         Ubicación: {prod.ubicacionLibre || `${prod.repisa?.letra || ''} ${prod.estante?.numero || ''}`}
                       </p>
-                      {prod.cantidad <= 1 && (
-                        <p className="text-sm font-medium text-red-600">⚠️ Stock bajo</p>
-                      )}
+                      {prod.cantidad === 0 ? (
+  <p className="text-sm font-medium text-red-600">❌ Sin stock</p>
+) : prod.cantidad < 2 ? (
+  <p className="text-sm font-medium text-yellow-600">⚠️ Stock bajo</p>
+) : null}
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => abrirModalVenta(prod)}
-                    className="rounded bg-green-600 px-3 py-1 text-sm text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors"
+                  <button onClick={() => abrirModalVenta(prod)} disabled={prod.cantidad === 0} className="rounded bg-green-600 px-3 py-1 text-sm text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     aria-label={`Agregar ${prod.descripcion} a la venta`}
                   >
                     <ShoppingCart size={16} className="inline mr-1" />
@@ -381,23 +400,32 @@ export default function Stock() {
         </div>
       )}
 
-      {/* Paginación mejorada */}
+      {/* Paginación mejorada con flechas e input */}
       {!loading && productos.length > 0 && (
-        <div className="mt-6 flex justify-center items-center gap-4">
+        <div className="mt-6 flex justify-center items-center space-x-2">
           <button
             disabled={pagina === 1}
-            onClick={() => setPagina(p => p - 1)}
-            className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors disabled:hover:bg-gray-200"
+            onClick={() => setPagina(pagina - 1)}
+            className="inline-flex items-center px-2 py-1 border border-gray-200 rounded-md hover:bg-gray-100 disabled:opacity-50"
           >
-            Anterior
+            <ChevronLeft size={20} />
           </button>
-          <span className="font-medium">Página {pagina} de {totalPaginas}</span>
+          <input
+            type="number"
+            min="1"
+            max={totalPaginas}
+            value={pageInput}
+            onChange={(e) => setPageInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && goToPage()}
+            className="w-16 text-center border border-gray-200 rounded-md px-2 py-1 text-sm focus:ring-0 focus:border-gray-300"
+          />
+          <span className="text-sm text-gray-600">de {totalPaginas}</span>
           <button
             disabled={pagina === totalPaginas}
-            onClick={() => setPagina(p => p + 1)}
-            className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors disabled:hover:bg-gray-200"
+            onClick={() => setPagina(pagina + 1)}
+            className="inline-flex items-center px-2 py-1 border border-gray-200 rounded-md hover:bg-gray-100 disabled:opacity-50"
           >
-            Siguiente
+            <ChevronRight size={20} />
           </button>
         </div>
       )}
@@ -501,7 +529,7 @@ export default function Stock() {
                   <>
                     <label className="text-sm block mb-1">Repisa</label>
                     <select
-                      value={formEditar.repisaId}
+                      value={formEditar.repisaId ?? ''}
                       onChange={e => setFormEditar(prev => ({ ...prev, repisaId: parseInt(e.target.value), estanteId: null }))}
                       className="w-full border border-gray-300 rounded px-3 py-2 mb-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                     >
@@ -513,7 +541,7 @@ export default function Stock() {
 
                     <label className="text-sm block mb-1">Estante</label>
                     <select
-                      value={formEditar.estanteId}
+                      value={formEditar.estanteId ?? ''}
                       onChange={e => setFormEditar(prev => ({ ...prev, estanteId: parseInt(e.target.value) }))}
                       className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                     >

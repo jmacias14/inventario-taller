@@ -1,11 +1,10 @@
 import express from 'express'
 import multer from 'multer'
 import xlsx from 'xlsx'
-import { PrismaClient } from '@prisma/client'
+import prisma from '../db.js';
 import fs from 'fs'
 
 const router = express.Router()
-const prisma = new PrismaClient()
 const upload = multer({ dest: 'uploads/' })
 
 function normalizarSku(sku) {
@@ -88,7 +87,6 @@ router.post('/', upload.single('file'), async (req, res) => {
     // Usar el map de encabezados flexible
     const filasProcesadas = rawRows.map((filaCruda, index) => {
       const fila = mapearFila(filaCruda, headerMap)
-      // DEBUG: Muestra la fila ya "mapeada"
       if (index < 3) console.log(`[DEBUG] Fila procesada #${index + 2}:`, fila)
       const skuRaw = fila.sku
       const descripcionRaw = fila.descripcion
@@ -134,8 +132,6 @@ router.post('/', upload.single('file'), async (req, res) => {
     })
     console.log("[DEBUG] Primeras 3 filas ya mapeadas/finales:", filasProcesadas.slice(0, 3))
 
-    // --- El resto del código queda igual (desde aquí) ---
-
     // --- Detectar repisas y estantes para crear si faltan ---
     const repisaMap = {}
     for (const fila of filasProcesadas) {
@@ -164,10 +160,7 @@ router.post('/', upload.single('file'), async (req, res) => {
           })
           avisos.push(`Repisa ${letra} creada con ${estantesNecesarios.size} estantes.`)
         } else {
-          const existentes = await tx.estante.findMany({
-            where: { repisaId: repisa.id }
-          })
-
+          const existentes = await tx.estante.findMany({ where: { repisaId: repisa.id } })
           const existentesSet = new Set(existentes.map(e => e.numero))
           const faltantes = [...estantesNecesarios].filter(e => !existentesSet.has(String(e)))
 
@@ -180,7 +173,7 @@ router.post('/', upload.single('file'), async (req, res) => {
         }
       }
 
-      // --- Insertar productos ---
+      // --- Insertar productos y movimientos ---
       for (const fila of filasProcesadas) {
         let {
           filaIndex, sku, descripcion, cantidad,
@@ -209,9 +202,7 @@ router.post('/', upload.single('file'), async (req, res) => {
               where: { numero: String(estanteRaw), repisaId: repisa.id }
             })
           }
-        } else if (
-          (repisaRaw && repisaRaw.trim() !== "") || (estanteRaw && estanteRaw.trim() !== "")
-        ) {
+        } else if ((repisaRaw && repisaRaw.trim() !== "") || (estanteRaw && estanteRaw.trim() !== "")) {
           ubicacionLibre = `${repisaRaw} ${estanteRaw}`.trim()
         } else {
           ubicacionLibre = "No Posee"
@@ -232,12 +223,27 @@ router.post('/', upload.single('file'), async (req, res) => {
           dataProducto.repisa = { connect: { id: repisa.id } }
           dataProducto.estante = { connect: { id: estante.id } }
         } else {
-          errores.push(`Fila ${filaIndex}: Ubicación inválida (no se pudo determinar repisa/estante ni ubicación libre)`)
+          errores.push(`Fila ${filaIndex}: Ubicación inválida`)
           continue
         }
 
         try {
-          await tx.producto.create({ data: dataProducto })
+          // capturamos el producto recién creado
+          const nuevoProducto = await tx.producto.create({ data: dataProducto })
+
+          // si hay cantidad, registramos el movimiento
+          if (cantidad > 0) {
+            await tx.movimiento.create({
+              data: {
+                tipo: 'ingreso',
+                productoId: nuevoProducto.id,
+                cantidad,
+                repisaId: nuevoProducto.repisaId,
+                estanteId: nuevoProducto.estanteId,
+                observaciones: 'Importación masiva'
+              }
+            })
+          }
         } catch (err) {
           errores.push(`Fila ${filaIndex}: Error al guardar producto (${err.message})`)
         }
@@ -247,40 +253,24 @@ router.post('/', upload.single('file'), async (req, res) => {
     fs.unlinkSync(req.file.path)
 
     if (errores.length > 0) {
-      return res.status(400).json({
-        success: false,
-        errores,
-        avisos
-      })
+      return res.status(400).json({ success: false, errores, avisos })
     }
 
-    return res.json({
-      success: true,
-      avisos,
-      message: "Importación completada correctamente."
-    })
+    return res.json({ success: true, avisos, message: "Importación completada correctamente." })
 
   } catch (error) {
-    if (error && error.errores && error.avisos) {
-      return res.status(400).json({
-        success: false,
-        errores: error.errores,
-        avisos: error.avisos
-      })
+    console.error(error)
+    if (error.errores && error.avisos) {
+      return res.status(400).json({ success: false, errores: error.errores, avisos: error.avisos })
     }
-    if (error && typeof error === "object" && error.code === "P2028") {
+    if (error.code === "P2028") {
       return res.status(500).json({
         success: false,
-        errores: ["Error: El proceso de importación fue demasiado largo. Intente con un archivo más pequeño o contacte a soporte."],
+        errores: ["Error: El proceso de importación fue demasiado largo."],
         avisos: []
       })
     }
-    console.error(error)
-    return res.status(500).json({
-      success: false,
-      errores: [error?.message || "Error desconocido"],
-      avisos: []
-    })
+    return res.status(500).json({ success: false, errores: [error.message || "Error desconocido"], avisos: [] })
   }
 })
 

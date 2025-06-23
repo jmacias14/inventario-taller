@@ -1,3 +1,40 @@
+Write-Host "`n>>> Inventario Taller - Setup SSL + Docker + Firewall <<<`n"
+
+# — 0) Configurar reglas de firewall —
+Try {
+    # Frontend Vite (5173)
+    New-NetFirewallRule `
+      -DisplayName "Allow Vite Frontend 5173" `
+      -Direction Inbound `
+      -LocalPort 5173 `
+      -Protocol TCP `
+      -Action Allow -ErrorAction Stop
+
+    # API Backend (3001)
+    New-NetFirewallRule `
+      -DisplayName "Allow API Backend 3001" `
+      -Direction Inbound `
+      -LocalPort 3001 `
+      -Protocol TCP `
+      -Action Allow -ErrorAction Stop
+
+    # Postgres (5432)
+    New-NetFirewallRule `
+      -DisplayName "Allow Postgres 5432" `
+      -Direction Inbound `
+      -LocalPort 5432 `
+      -Protocol TCP `
+      -Action Allow -ErrorAction Stop
+
+    # Asegurar que el firewall está habilitado
+    Set-NetFirewallProfile -Profile Domain,Private,Public -Enabled True -ErrorAction Stop
+
+    Write-Host "✅ Reglas de firewall configuradas.`n"
+}
+Catch {
+    Write-Warning "❗ Error al aplicar reglas de firewall: $_`n"
+}
+
 Write-Host "`n>>> Inventario Taller - Setup SSL + Docker <<<`n"
 
 # 1. Ingresar IP manualmente con validación adicional
@@ -120,7 +157,6 @@ Write-Host "✔️ Archivo .env creado y verificado correctamente."
 Write-Host "`nContenido actual del archivo .env:`n"
 Get-Content $envFile | Write-Host
 
-
 # 7. Verificar Docker y levantar Docker Compose
 Write-Host "`nVerificando Docker..."
 docker --version | Out-Null
@@ -130,7 +166,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "`nListo! Ahora se inicia Docker Compose con SSL configurado.`n"
-docker compose up --build -d
+docker compose build --no-cache && docker compose up -d
 if ($LASTEXITCODE -ne 0) {
     Write-Host "❌ Error ejecutando Docker Compose" -ForegroundColor Red
     Write-Host "Revisá los logs con: docker compose logs"

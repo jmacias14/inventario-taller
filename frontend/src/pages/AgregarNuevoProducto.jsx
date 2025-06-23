@@ -202,8 +202,6 @@ export default function AgregarNuevoProducto({ volver }) {
           <option value="">Seleccione unidad *</option>
           <option value="Unidad">Unidad</option>
           <option value="Litro">Litro</option>
-          <option value="Metro">Metro</option>
-          <option value="Paquete">Paquete</option>
         </select>
 
         <textarea

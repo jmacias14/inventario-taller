@@ -10,7 +10,7 @@ datasource db {
 
 model Producto {
   id             Int          @id @default(autoincrement())
-  sku            String       @unique   // <-- agregado unique
+  sku            String       @unique
   marca          String
   descripcion    String
   cantidad       Float
@@ -27,23 +27,33 @@ model Producto {
 }
 
 model Movimiento {
-  id          Int       @id @default(autoincrement())
-  tipo        String    // Ejemplo: "entrada", "salida", etc.
-  cantidad    Float
-  fecha       DateTime  @default(now())
-  observacion String?
+  id             Int       @id @default(autoincrement())
+  tipo           String
+  cantidad       Float
+  fecha          DateTime  @default(now())
+  observaciones  String?   // renombrado de `observacion`
+  ubicacionLibre String?   // nuevo campo
+
   producto    Producto  @relation(fields: [productoId], references: [id])
   productoId  Int
-  ventaId     Int?      // Nueva columna nullable para la relación con Venta
+
+  ventaId     Int?
   venta       Venta?    @relation(fields: [ventaId], references: [id])
+
+  repisaId    Int?
+  estanteId   Int?
+  repisa      Repisa?   @relation(fields: [repisaId], references: [id])
+  estante     Estante?  @relation(fields: [estanteId], references: [id])
 }
 
 model Venta {
   id           Int        @id @default(autoincrement())
   comentarios  String?
   createdAt    DateTime   @default(now())
+  anulada      Boolean    @default(false)
+
   items        VentaItem[]
-  movimientos  Movimiento[]  // Relación inversa para movimientos asociados a esta venta
+  movimientos  Movimiento[]
 }
 
 model VentaItem {
@@ -51,21 +61,23 @@ model VentaItem {
   cantidad    Float
   ventaId     Int
   venta       Venta     @relation(fields: [ventaId], references: [id])
-  producto    Producto  @relation(fields: [productoId], references: [id])
   productoId  Int
+  producto    Producto  @relation(fields: [productoId], references: [id])
 }
 
 model Repisa {
-  id        Int        @id @default(autoincrement())
-  letra     String     @unique
-  estantes  Estante[]
-  productos Producto[]
+  id           Int          @id @default(autoincrement())
+  letra        String       @unique
+  estantes     Estante[]
+  productos    Producto[]
+  movimientos  Movimiento[]
 }
 
 model Estante {
-  id        Int       @id @default(autoincrement())
-  numero    String
-  repisaId  Int
-  repisa    Repisa    @relation(fields: [repisaId], references: [id])
-  productos Producto[]
+  id           Int          @id @default(autoincrement())
+  numero       String
+  repisaId     Int
+  repisa       Repisa       @relation(fields: [repisaId], references: [id])
+  productos    Producto[]
+  movimientos  Movimiento[]
 }

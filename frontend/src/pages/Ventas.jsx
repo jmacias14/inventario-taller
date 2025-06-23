@@ -1,6 +1,7 @@
+// src/pages/Ventas.jsx
 import { useEffect, useState } from 'react'
 import { useVentaStore } from '../store/ventaStore'
-import { api } from "../api.js";
+import { api } from "../api.js"
 import { TrashIcon, XMarkIcon } from '@heroicons/react/24/solid'
 import { ChevronRight, ChevronUp } from 'lucide-react'
 import { useToast } from "../context/ToastContext"
@@ -26,13 +27,14 @@ export default function Ventas() {
         cantidad: Number(p.cantidadSeleccionada || p.cantidad || 1)
       }))
       setMostrarConfirmacion(false)
-      await api.post('/ventas', { comentarios, productos })  // Cambié /sales a /ventas
+      await api.post('/ventas', { comentarios, productos })
       reiniciarVenta()
       setComentarios('')
       showToast('Venta finalizada correctamente', 'success')
     } catch (err) {
       console.error(err)
-      showToast('Error al finalizar la venta', 'error')
+      const msg = err.response?.data?.error || 'Error al finalizar la venta'
+      showToast(msg, 'error')
     }
   }
 
@@ -53,6 +55,14 @@ export default function Ventas() {
   const pluralizar = (unidad, cantidad) => {
     if (unidad === 'Unidad') return cantidad === 1 ? 'Unidad' : 'Unidades'
     return cantidad === 1 ? unidad : unidad + 's'
+  }
+
+  const formatearUbicacion = (prod) => {
+    const libre = prod.ubicacionLibre
+    const rep = prod.repisa?.letra ?? ''
+    const est = prod.estante?.numero ?? ''
+    const combinada = `${rep} ${est}`.trim()
+    return libre || combinada || '—'
   }
 
   return (
@@ -126,10 +136,10 @@ export default function Ventas() {
                   )}
                 </button>
                 <div className="text-base font-medium flex-1">
-                  {prod.descripcion} — {prod.cantidadSeleccionada || prod.cantidad || 1} {pluralizar(prod.unidad, prod.cantidadSeleccionada || prod.cantidad || 1)}
+                  {prod.descripcion} — {prod.cantidadSeleccionada || prod.cantidad || 1}{' '}
+                  {pluralizar(prod.unidad, prod.cantidadSeleccionada || prod.cantidad || 1)}
                 </div>
                 <div className="flex items-center gap-2">
-                  
                   <button
                     onClick={() => handleQuitarProducto(prod.id)}
                     className="text-red-600 hover:text-red-800"
@@ -144,7 +154,7 @@ export default function Ventas() {
                   <p><strong>Marca:</strong> {prod.marca}</p>
                   <p><strong>SKU:</strong> {prod.sku || '—'}</p>
                   <p><strong>Unidad:</strong> {prod.unidad}</p>
-                  <p><strong>Ubicación:</strong> {prod.ubicacion}</p>
+                  <p><strong>Ubicación:</strong> {formatearUbicacion(prod)}</p>
                   <p><strong>Observaciones:</strong> {prod.observaciones || '—'}</p>
                 </div>
               )}
