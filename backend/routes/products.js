@@ -88,7 +88,8 @@ router.get('/sku/:sku', async (req, res) => {
 // Crear producto (o sumar cantidad si existe) y registrar movimiento
 router.post('/', async (req, res) => {
   try {
-    const { tipoUbicacion, origen, repisaId, estanteId, ubicacionLibre, ...rest } = req.body
+    // Se extrae `cantidad` por separado para que no quede en `rest`
+    const { tipoUbicacion, origen, repisaId, estanteId, ubicacionLibre, cantidad, ...rest } = req.body
 
     const dataCommon = { ...rest }
     if (tipoUbicacion === 'otro') {
@@ -105,7 +106,7 @@ router.post('/', async (req, res) => {
     if (existente) {
       const productoActualizado = await changeStock({
         productoId: existente.id,
-        delta: Number(rest.cantidad),
+        delta: Number(cantidad), // usa `cantidad` en lugar de rest.cantidad
         tipoMovimiento: 'INGRESO_MANUAL',
         referenciaId: null,
         contexto: 'Ingreso manual de producto (AgregarProductoNuevo.jsx)',
@@ -122,7 +123,7 @@ router.post('/', async (req, res) => {
       })
       const productoActualizado = await changeStock({
         productoId: nuevo.id,
-        delta: Number(rest.cantidad),
+        delta: Number(cantidad), // usa `cantidad` en lugar de rest.cantidad
         tipoMovimiento: 'INGRESO_MANUAL',
         referenciaId: null,
         contexto: 'Ingreso manual de producto (AgregarProductoNuevo.jsx)'
